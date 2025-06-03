@@ -4,7 +4,7 @@
     "windowsAuthentication": true,
     "anonymousAuthentication": false,
     "iisExpress": {
-      "applicationUrl": "http://10.12.9.122:5000"
+      "applicationUrl": "http://10.12.9.122:4000"
     }
   },
   "profiles": {

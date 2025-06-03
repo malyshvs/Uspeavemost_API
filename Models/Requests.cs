@@ -1,22 +1,28 @@
 ﻿using System.Data.SqlClient;
 using Uspevaemost_API.Controllers;
+using Microsoft.Extensions.Configuration;
 
 namespace Uspevaemost_API.Models
 {
     public class Requests
     {
-        private SqlConnection sql = new SqlConnection("Persist Security Info = False; Integrated Security=true;" +
-               $"server = 10.2.9.73; Encrypt = True; TrustServerCertificate=true;");
-        public Requests(string _uchps)
+        private readonly string connectionString;
+        private SqlConnection sql;
+        public Requests(string _uchps, IConfiguration configuration)
         {
             uchps=_uchps;
+            connectionString = configuration.GetConnectionString("DefaultConnection");
+            sql = new SqlConnection(connectionString);
         }
-        private string uchps;
-        public static string uchp(string name)
-        {
-        SqlConnection sq = new SqlConnection("Persist Security Info = False; Integrated Security=true;" +
-               $"server = 10.2.9.73; Encrypt = True; TrustServerCertificate=true;");
 
+
+
+
+        private string uchps;
+        public static string uchp(string name,string conn)
+        {
+        SqlConnection sq = new SqlConnection(conn);
+            Logger.Log(sq.State.ToString());
              string query = $@"select string_agg(''''+c.Сокращение+'''',',') 
                                     from Деканат.dbo.Пользователи a
                                     inner join Деканат.dbo.[Пользователи-Роли] b on b.КодПользователя=a.ID
@@ -24,6 +30,7 @@ namespace Uspevaemost_API.Models
                                     inner join Деканат.dbo.Роли d on d.Код=b.кодРоли
                                     where b.КодРоли=28 and a.Логин='{name}'";
             string uchpList="";
+            Logger.Log(query);
             try
             {
                 sq.Open();
@@ -33,21 +40,21 @@ namespace Uspevaemost_API.Models
                 while (dr.Read())
                 {
                     uchpList = dr[0].ToString();
-                    Console.WriteLine(dr[0].ToString());
+                    Logger.Log(dr[0].ToString());
                 }
                 dr.Close();
 
             }
             catch (SqlException er)
             {
-                Console.WriteLine(er.Message);
+                Logger.Log(er.ToString());
                 sq.Close();
             }
             return uchpList;
         }
         public List<string[]> getData2(List<string> year, List<string> sem, List<string> uo, List<string> fo, List<string> curs)
         {
-            
+            Logger.Log("im here");
             string query = $@"select d.Сокращение,c.Название,c.Курс, 
 max(fo.ФормаОбучения) as 'Форма обучения', 
 max(uo.Уровень) as 'Уровень образования',
@@ -173,7 +180,7 @@ c.Курс in ({string.Join(", ", curs)})and
 c.УчебныйГод in ({string.Join(", ", year)})
 group by d.Сокращение, c.Название, c.Курс, CONCAT(b.фамилия, ' ',b.имя,' ',b.Отчество)
 order by d.Сокращение, c.Название, c.Курс,CONCAT(b.фамилия, ' ',b.имя,' ',b.Отчество)";
-
+            Logger.Log(query);
             try
             {
                 sql.Open();

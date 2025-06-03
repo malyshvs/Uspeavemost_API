@@ -11,26 +11,25 @@ namespace Uspevaemost_API.Controllers
     {
     
         private readonly Services.ReportService _reportService;
-        public ExcelController(Services.ReportService reportService)
+        private readonly string conn;
+        public ExcelController(Services.ReportService reportService, IConfiguration configuration)
         {
             _reportService = reportService;
+            conn = configuration.GetConnectionString("DefaultConnection"); 
         }
 
         [HttpPost("download")]
         public async Task<IActionResult> DownloadReport([FromBody] Models.ReportRequest request)
         {
-            
-            var username = User.Identity?.Name;
-            username = username.Split("\\")[1];
-            for (var i = 0; i < 100; i++)
-            {
-                System.Diagnostics.Debug.WriteLine(username);
 
-            }
+            var username = request.name;
+            username = username.Split("\\")[1];
+            Logger.Log(username);
+   
             if (username!=null)
             {
-                string uchps = Requests.uchp(username);
-                System.Diagnostics.Debug.WriteLine(uchps);
+                string uchps = Requests.uchp(username,conn);
+                Logger.Log(uchps);
                 if (uchps != "")
                 {
                     var fileContent = await _reportService.GenerateExcelReportAsync(request, uchps);

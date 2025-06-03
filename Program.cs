@@ -1,7 +1,7 @@
 
-using Microsoft.AspNetCore.Authentication.Negotiate;
 using Microsoft.AspNetCore.Mvc;
 using OfficeOpenXml;
+
 using Uspevaemost_API.Models;
 using Uspevaemost_API.Services;
 
@@ -21,8 +21,6 @@ namespace Uspevaemost_API
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();
 
-            builder.Services.AddAuthentication(NegotiateDefaults.AuthenticationScheme)
-    .AddNegotiate();
 
             builder.WebHost.UseIISIntegration();
 
@@ -39,11 +37,8 @@ namespace Uspevaemost_API
                 app.UseSwaggerUI();
             }
 
-            app.UseHttpsRedirection();
 
 
-            app.UseAuthentication();
-            app.UseAuthorization();
 
 
 

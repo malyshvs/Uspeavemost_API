@@ -23,7 +23,7 @@ namespace Uspevaemost_API.Services
             var fo = request.FormyObucheniya.Select(f => $"'{f}'").ToList();
             var curs = request.Kurs.Select(c => $"'{c}'").ToList();
 
-            Models.Requests req = new(uchps);
+            Models.Requests req = new(uchps,_config);
 
 
             var list = req.getData2(year,sem,uo,fo,curs);
