@@ -7,7 +7,7 @@
         public List<string> FormyObucheniya { get; set; }
         public List<string> Goda { get; set; }
         public List<string> Semestry { get; set; }
-        public string name { get; set; }
+        public string token { get; set; }
     }
 
 }

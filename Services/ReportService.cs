@@ -15,18 +15,18 @@ namespace Uspevaemost_API.Services
         {
 
         }
-        public async Task<byte[]> GenerateExcelReportAsync(Models.ReportRequest request,string uchps)
+        public async Task<byte[]> GenerateExcelReportAsync(Models.ReportRequest request,string username)
         {
-            var year = request.Goda.Select(y => $"'{y}'").ToList();
-            var sem = request.Semestry.Select(s => $"'{s}'").ToList();
-            var uo = request.Urovni.Select(u => $"'{u}'").ToList();
-            var fo = request.FormyObucheniya.Select(f => $"'{f}'").ToList();
-            var curs = request.Kurs.Select(c => $"'{c}'").ToList();
+            var year = request.Goda;
+            var sem = request.Semestry;
+            var uo = request.Urovni;
+            var fo = request.FormyObucheniya;
+            var curs = request.Kurs;
 
-            Models.Requests req = new(uchps,_config);
+            Models.Requests req = new(_config);
 
 
-            var list = req.getData2(year,sem,uo,fo,curs);
+            var list = req.getData2(year,sem,uo,fo,curs,username);
             // Пример создания Excel
             using var package = new ExcelPackage();
 
@@ -214,11 +214,29 @@ namespace Uspevaemost_API.Services
                     }
                     row++;
                 }
+                sheet.InsertColumn(4, 1);
+                row--;
+                sheet.Cells[1, 4].Value = "Семестр"; 
+                sheet.Cells[3, 4,row-1,4].Value = int.Parse(string.Join(' ',sem));
+                sheet.Cells[1, 4, row, 4].Style.Font.Name = "Times New Roman";
+                sheet.Cells[1, 4, row, 4].Style.Font.Size = 10;
+                sheet.Cells[1, 4].Style.HorizontalAlignment = ExcelHorizontalAlignment.Justify;
+           
+               
+                sheet.Cells[1, 4, row - 1, 4].Style.Border.Bottom.Style = ExcelBorderStyle.Thin;
+                sheet.Cells[1, 4, row - 1, 4].Style.Border.Top.Style = ExcelBorderStyle.Thin;
+                sheet.Cells[1, 4, row - 1, 4].Style.Border.Left.Style = ExcelBorderStyle.Thin;
+                sheet.Cells[1, 4, row - 1, 4].Style.Border.Right.Style = ExcelBorderStyle.Thin;
+
+                sheet.Cells[1, 4].Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
+                sheet.Cells[1, 4].Style.VerticalAlignment = ExcelVerticalAlignment.Center;
+                sheet.Cells[1, 4].Style.Font.Bold = true;
+                sheet.Cells[1,4, 2, 4].Merge = true;
             }
             // по группам
             var svodG = package.Workbook.Worksheets.Add("по группам");
             {
-                List<string[]> groups = req.getGroups(year, sem, uo, fo, curs);
+                List<string[]> groups = req.getGroups(year, sem, uo, fo, curs,username);
 
                 svodG.Cells[1, 1].Value = "УчП";
                 svodG.Cells[1, 2].Value = "Группа";
@@ -307,7 +325,7 @@ namespace Uspevaemost_API.Services
             // по учп
             var svogUch = package.Workbook.Worksheets.Add("по УчП");
             {
-                List<string[]> groups = req.getbyUchp(year, sem, uo, fo, curs);
+                List<string[]> groups = req.getbyUchp(year, sem, uo, fo, curs, username);
 
                 svogUch.Cells[1, 1].Value = "УчП";
                 svogUch.Cells[1, 2].Value = "Отличники";
@@ -392,11 +410,375 @@ namespace Uspevaemost_API.Services
                     svogUch.Cells[1, 1, row, 9].AutoFitColumns();
                 }
             }
+            // по кафедрам
+            var kafs = package.Workbook.Worksheets.Add("По кафедрам");
+            {
+                list = req.getbyKaf(year, sem, uo, fo, curs,username);
+                kafs.Cells[1, 1].Value = "Кафедра";
+                kafs.Cells[1, 2].Value = "Отличники";
+                kafs.Cells[1, 3].Value = "Хорошисты";
+                kafs.Cells[1, 4].Value = "Троечники";
+                kafs.Cells[1, 5].Value = "Неуспевающие";
+                kafs.Cells[1, 6].Value = "Качественная успеваемость (в %)";
+                kafs.Cells[1, 7].Value = "Абсолютная успеваемость (в %)";
+                kafs.Cells[1, 8].Value = "Средний балл (100)";
+                kafs.Cells[1, 9].Value = "Средняя оценка (5)";
+
+                List<double[]> ints = new List<double[]>();
+                //ввод данных в таблицу
+                int row = list.Count() + 1;
+                for (int i = 0; i < list.Count(); i++)
+                {
+                    string[] data = list[i];
+                    for (int j = 0; j < data.Length; j++)
+                    {
+                        if (j == 6)
+                        {
+                            if (double.TryParse(data[j], out var k) && double.TryParse(data[j - 1], out var l))
+                            {
+
+                                kafs.Cells[i + 2, j + 2].Value = l / k;
+                            }
+                            else
+                            {
+                                kafs.Cells[i + 2, j + 2].Value = 0;
+                            }
+                        }
+                        if (j == 8)
+                        {
+                            if (double.TryParse(data[j], out var k) && double.TryParse(data[j - 1], out var l))
+                            {
+                                kafs.Cells[i + 2, j + 1].Value = l / k;
+                            }
+                            else
+                            {
+                                kafs.Cells[i + 2, j + 1].Value = 0;
+                            }
+
+
+                        }
+                        if (j == 0)
+                        {
+                            kafs.Cells[i + 2, j + 1].Value = data[j];
+                        }
+                        if (j >= 1 && j <= 4)
+                        {
+                            int.TryParse(data[j], out int k);
+                            kafs.Cells[i + 2, j + 1].Value = k;
+                        }
+
+                    }
+                    double total = Int32.Parse(data[1]) + Int32.Parse(data[2]) + Int32.Parse(data[3]) + Int32.Parse(data[4]);
+                    double kach = Int32.Parse(data[1]) + Int32.Parse(data[2]);
+                    double absol = Int32.Parse(data[1]) + Int32.Parse(data[2]) + Int32.Parse(data[3]);
+                    if (total > 0)
+                    {
+                        kafs.Cells[i + 2, 6].Value = kach / total;
+                        kafs.Cells[i + 2, 7].Value = absol / total;
+                    }
+                    else
+                    {
+                        kafs.Cells[i + 2, 6].Value = 0;
+                        kafs.Cells[i + 2, 7].Value = 0;
+                    }
+                    kafs.Cells[i + 2, 6].Style.Numberformat.Format = "0.00%";
+                    kafs.Cells[i + 2, 7].Style.Numberformat.Format = "0.00%";
+                }
+
+                kafs.Cells[1, 1, row, 9].Style.Font.Name = "Times New Roman";
+                kafs.Cells[1, 1, row, 9].Style.Font.Size = 10;
+                {
+                    kafs.Cells[1, 1, row, 9].Style.Border.Bottom.Style = ExcelBorderStyle.Thin;
+                    kafs.Cells[1, 1, row, 9].Style.Border.Top.Style = ExcelBorderStyle.Thin;
+                    kafs.Cells[1, 1, row, 9].Style.Border.Left.Style = ExcelBorderStyle.Thin;
+                    kafs.Cells[1, 1, row, 9].Style.Border.Right.Style = ExcelBorderStyle.Thin;
+                    kafs.Cells[1, 1, 1, 9].Style.Font.Bold = true;
+                    kafs.Cells[2, 8, row, 9].Style.Numberformat.Format = "0.00";
+                    kafs.Cells[1, 1, row, 9].AutoFitColumns();
+                }
+            }
+
+            // по кафедрам + курсы
+            var kafscurs = package.Workbook.Worksheets.Add("По кафедрам и курсам");
+            {
+                list = req.getbyKafCurs(year, sem, uo, fo, curs,username);
+                kafscurs.Cells[1, 1].Value = "Кафедра";
+                kafscurs.Cells[1, 2].Value = "Курс";
+                kafscurs.Cells[1, 3].Value = "Отличники";
+                kafscurs.Cells[1, 4].Value = "Хорошисты";
+                kafscurs.Cells[1, 5].Value = "Троечники";
+                kafscurs.Cells[1, 6].Value = "Неуспевающие";
+                kafscurs.Cells[1, 7].Value = "Качественная успеваемость (в %)";
+                kafscurs.Cells[1, 8].Value = "Абсолютная успеваемость (в %)";
+                kafscurs.Cells[1, 9].Value = "Средний балл (100)";
+                kafscurs.Cells[1, 10].Value = "Средняя оценка (5)";
+
+                List<double[]> ints = new List<double[]>();
+                //ввод данных в таблицу
+                int row = list.Count() + 1;
+                for (int i = 0; i < list.Count(); i++)
+                {
+                    string[] data = list[i];
+
+                    for (int j = 0; j < data.Length; j++)
+                    {
+                        Console.Write(data[j] + " ");
+                        if (j == 7)
+                        {
+                            if (double.TryParse(data[j], out var k) && double.TryParse(data[j - 1], out var l))
+                            {
+
+                                kafscurs.Cells[i + 2, j + 2].Value = l / k;
+                            }
+                            else
+                            {
+                                kafscurs.Cells[i + 2, j + 2].Value = 0;
+                            }
+                        }
+                        if (j == 9)
+                        {
+                            if (double.TryParse(data[j], out var k) && double.TryParse(data[j - 1], out var l))
+                            {
+                                kafscurs.Cells[i + 2, j + 1].Value = l / k;
+                            }
+                            else
+                            {
+                                kafscurs.Cells[i + 2, j + 1].Value = 0;
+                            }
+
+
+                        }
+                        if (j == 0)
+                        {
+                            kafscurs.Cells[i + 2, j + 1].Value = data[j];
+                            kafscurs.Cells[i + 2, j + 2].Value = data[j + 1];
+                        }
+                        if (j >= 2 && j <= 5)
+                        {
+                            int.TryParse(data[j], out int k);
+                            kafscurs.Cells[i + 2, j + 1].Value = k;
+                        }
+
+                    }
+                    Console.WriteLine();
+                    double total = Int32.Parse(data[2]) + Int32.Parse(data[3]) + Int32.Parse(data[4]) + Int32.Parse(data[5]);
+                    double kach = Int32.Parse(data[2]) + Int32.Parse(data[3]);
+                    double absol = Int32.Parse(data[2]) + Int32.Parse(data[3]) + Int32.Parse(data[4]);
+                    if (total > 0)
+                    {
+                        kafscurs.Cells[i + 2, 7].Value = kach / total;
+                        kafscurs.Cells[i + 2, 8].Value = absol / total;
+                    }
+                    else
+                    {
+                        kafscurs.Cells[i + 2, 7].Value = 0;
+                        kafscurs.Cells[i + 2, 8].Value = 0;
+                    }
+                    kafscurs.Cells[i + 2, 7].Style.Numberformat.Format = "0.00%";
+                    kafscurs.Cells[i + 2, 8].Style.Numberformat.Format = "0.00%";
+                }
+
+                kafscurs.Cells[1, 1, row, 10].Style.Font.Name = "Times New Roman";
+                kafscurs.Cells[1, 1, row, 10].Style.Font.Size = 10;
+                {
+                    kafscurs.Cells[1, 1, row, 10].Style.Border.Bottom.Style = ExcelBorderStyle.Thin;
+                    kafscurs.Cells[1, 1, row, 10].Style.Border.Top.Style = ExcelBorderStyle.Thin;
+                    kafscurs.Cells[1, 1, row, 10].Style.Border.Left.Style = ExcelBorderStyle.Thin;
+                    kafscurs.Cells[1, 1, row, 10].Style.Border.Right.Style = ExcelBorderStyle.Thin;
+                    kafscurs.Cells[1, 1, 1, 10].Style.Font.Bold = true;
+                    kafscurs.Cells[2, 9, row, 10].Style.Numberformat.Format = "0.00";
+                    kafscurs.Cells[1, 1, row, 10].AutoFitColumns();
+                }
+            }
+
+            // по опоп
+            var opop = package.Workbook.Worksheets.Add("По ОПОП");
+            {
+                list = req.getbyOPOP(year, sem, uo, fo, curs,username);
+                opop.Cells[1, 1].Value = "Код";
+                opop.Cells[1, 2].Value = "Направление";
+                opop.Cells[1, 3].Value = "Профиль/Специализация";
+                opop.Cells[1, 4].Value = "Отличники";
+                opop.Cells[1, 5].Value = "Хорошисты";
+                opop.Cells[1, 6].Value = "Троечники";
+                opop.Cells[1, 7].Value = "Неуспевающие";
+                opop.Cells[1, 8].Value = "Качественная успеваемость (в %)";
+                opop.Cells[1, 9].Value = "Абсолютная успеваемость (в %)";
+                opop.Cells[1, 10].Value = "Средний балл (100)";
+                opop.Cells[1, 11].Value = "Средняя оценка (5)";
+
+                List<double[]> ints = new List<double[]>();
+                //ввод данных в таблицу
+                int row = list.Count() + 1;
+                for (int i = 0; i < list.Count(); i++)
+                {
+                    string[] data = list[i];
+
+                    for (int j = 0; j < data.Length; j++)
+                    {
+                        if (j == 8)
+                        {
+                            if (double.TryParse(data[j], out var k) && double.TryParse(data[j - 1], out var l))
+                            {
+
+                                opop.Cells[i + 2, j + 2].Value = l / k;
+                            }
+                            else
+                            {
+                                opop.Cells[i + 2, j + 2].Value = 0;
+                            }
+                        }
+                        if (j == 10)
+                        {
+                            if (double.TryParse(data[j], out var k) && double.TryParse(data[j - 1], out var l))
+                            {
+                                opop.Cells[i + 2, j + 1].Value = l / k;
+                            }
+                            else
+                            {
+                                opop.Cells[i + 2, j + 1].Value = 0;
+                            }
+
+
+                        }
+                        if (j == 0)
+                        {
+                            opop.Cells[i + 2, j + 1].Value = data[j];
+                            opop.Cells[i + 2, j + 2].Value = data[j + 1];
+                            opop.Cells[i + 2, j + 3].Value = data[j + 2];
+                        }
+                        if (j >= 3 && j <= 6)
+                        {
+                            int.TryParse(data[j], out int k);
+                            opop.Cells[i + 2, j + 1].Value = k;
+                        }
+
+                    }
+                    double total = Int32.Parse(data[3]) + Int32.Parse(data[4]) + Int32.Parse(data[5]) + Int32.Parse(data[6]);
+                    double kach = Int32.Parse(data[3]) + Int32.Parse(data[4]);
+                    double absol = Int32.Parse(data[3]) + Int32.Parse(data[4]) + Int32.Parse(data[5]);
+                    if (total > 0)
+                    {
+                        opop.Cells[i + 2, 8].Value = kach / total;
+                        opop.Cells[i + 2, 9].Value = absol / total;
+                    }
+                    else
+                    {
+                        opop.Cells[i + 2, 8].Value = 0;
+                        opop.Cells[i + 2, 9].Value = 0;
+                    }
+                    opop.Cells[i + 2, 8].Style.Numberformat.Format = "0.00%";
+                    opop.Cells[i + 2, 9].Style.Numberformat.Format = "0.00%";
+                }
+
+                opop.Cells[1, 1, row, 11].Style.Font.Name = "Times New Roman";
+                opop.Cells[1, 1, row, 11].Style.Font.Size = 10;
+                {
+                    opop.Cells[1, 1, row, 11].Style.Border.Bottom.Style = ExcelBorderStyle.Thin;
+                    opop.Cells[1, 1, row, 11].Style.Border.Top.Style = ExcelBorderStyle.Thin;
+                    opop.Cells[1, 1, row, 11].Style.Border.Left.Style = ExcelBorderStyle.Thin;
+                    opop.Cells[1, 1, row, 11].Style.Border.Right.Style = ExcelBorderStyle.Thin;
+                    opop.Cells[1, 1, 1, 11].Style.Font.Bold = true;
+                    opop.Cells[2, 9, row, 11].Style.Numberformat.Format = "0.00";
+                    opop.Cells[1, 1, row, 11].AutoFitColumns();
+                }
+            }
+            // по направлениям
+            var napr = package.Workbook.Worksheets.Add("По направлениям");
+            {
+                list = req.getbyNapr(year, sem, uo, fo, curs,username);
+                napr.Cells[1, 1].Value = "Код";
+                napr.Cells[1, 2].Value = "Направление";
+                napr.Cells[1, 3].Value = "Отличники";
+                napr.Cells[1, 4].Value = "Хорошисты";
+                napr.Cells[1, 5].Value = "Троечники";
+                napr.Cells[1, 6].Value = "Неуспевающие";
+                napr.Cells[1, 7].Value = "Качественная успеваемость (в %)";
+                napr.Cells[1, 8].Value = "Абсолютная успеваемость (в %)";
+                napr.Cells[1, 9].Value = "Средний балл (100)";
+                napr.Cells[1, 10].Value = "Средняя оценка (5)";
+
+                List<double[]> ints = new List<double[]>();
+                //ввод данных в таблицу
+                int row = list.Count() + 1;
+                for (int i = 0; i < list.Count(); i++)
+                {
+                    string[] data = list[i];
+
+                    for (int j = 0; j < data.Length; j++)
+                    {
+
+                        if (j == 7)
+                        {
+                            if (double.TryParse(data[j], out var k) && double.TryParse(data[j - 1], out var l))
+                            {
+
+                                napr.Cells[i + 2, j + 2].Value = l / k;
+                            }
+                            else
+                            {
+                                napr.Cells[i + 2, j + 2].Value = 0;
+                            }
+                        }
+                        if (j == 9)
+                        {
+                            if (double.TryParse(data[j], out var k) && double.TryParse(data[j - 1], out var l))
+                            {
+                                napr.Cells[i + 2, j + 1].Value = l / k;
+                            }
+                            else
+                            {
+                                napr.Cells[i + 2, j + 1].Value = 0;
+                            }
+
+
+                        }
+                        if (j == 0)
+                        {
+                            napr.Cells[i + 2, j + 1].Value = data[j];
+                            napr.Cells[i + 2, j + 2].Value = data[j + 1];
+                        }
+                        if (j >= 2 && j <= 5)
+                        {
+                            int.TryParse(data[j], out int k);
+                            napr.Cells[i + 2, j + 1].Value = k;
+                        }
+
+                    }
+                    double total = Int32.Parse(data[2]) + Int32.Parse(data[3]) + Int32.Parse(data[4]) + Int32.Parse(data[5]);
+                    double kach = Int32.Parse(data[2]) + Int32.Parse(data[3]);
+                    double absol = Int32.Parse(data[2]) + Int32.Parse(data[3]) + Int32.Parse(data[4]);
+                    if (total > 0)
+                    {
+                        napr.Cells[i + 2, 7].Value = kach / total;
+                        napr.Cells[i + 2, 8].Value = absol / total;
+                    }
+                    else
+                    {
+                        napr.Cells[i + 2, 7].Value = 0;
+                        napr.Cells[i + 2, 8].Value = 0;
+                    }
+                    napr.Cells[i + 2, 7].Style.Numberformat.Format = "0.00%";
+                    napr.Cells[i + 2, 8].Style.Numberformat.Format = "0.00%";
+                }
+
+                napr.Cells[1, 1, row, 10].Style.Font.Name = "Times New Roman";
+                napr.Cells[1, 1, row, 10].Style.Font.Size = 10;
+                {
+                    napr.Cells[1, 1, row, 10].Style.Border.Bottom.Style = ExcelBorderStyle.Thin;
+                    napr.Cells[1, 1, row, 10].Style.Border.Top.Style = ExcelBorderStyle.Thin;
+                    napr.Cells[1, 1, row, 10].Style.Border.Left.Style = ExcelBorderStyle.Thin;
+                    napr.Cells[1, 1, row, 10].Style.Border.Right.Style = ExcelBorderStyle.Thin;
+                    napr.Cells[1, 1, 1, 10].Style.Font.Bold = true;
+                    napr.Cells[2, 9, row, 10].Style.Numberformat.Format = "0.00";
+                    napr.Cells[1, 1, row, 10].AutoFitColumns();
+                }
+            }
 
             // по уровню
             var svodUO = package.Workbook.Worksheets.Add("по УО");
             {
-                List<string[]> groups = req.getbyUO(year, sem, uo, fo, curs);
+                List<string[]> groups = req.getbyUO(year, sem, uo, fo, curs, username);
 
                 svodUO.Cells[1, 1].Value = "Уровень образования";
                 svodUO.Cells[1, 2].Value = "Отличник";
@@ -485,7 +867,7 @@ namespace Uspevaemost_API.Services
             // по курсу
             var svodCURS = package.Workbook.Worksheets.Add("по курсу");
             {
-                List<string[]> groups = req.getbyCURS(year, sem, uo, fo, curs);
+                List<string[]> groups = req.getbyCURS(year, sem, uo, fo, curs, username);
 
                 svodCURS.Cells[1, 1].Value = "Курс";
                 svodCURS.Cells[1, 2].Value = "Отличник";
@@ -573,7 +955,7 @@ namespace Uspevaemost_API.Services
             // по курсу и УО
             var svodUOCURS = package.Workbook.Worksheets.Add("по курсу и УО");
             {
-                List<string[]> groups = req.getbyUOCurs(year, sem, uo, fo, curs);
+                List<string[]> groups = req.getbyUOCurs(year, sem, uo, fo, curs, username);
 
                 svodUOCURS.Cells[1, 1].Value = "Курс";
                 svodUOCURS.Cells[1, 2].Value = "Уровень образования";
@@ -669,7 +1051,7 @@ namespace Uspevaemost_API.Services
             // по форме
             var svodFO = package.Workbook.Worksheets.Add("по ФО");
             {
-                List<string[]> groups = req.getbyFO(year, sem, uo, fo, curs);
+                List<string[]> groups = req.getbyFO(year, sem, uo, fo, curs, username);
 
                 svodFO.Cells[1, 1].Value = "Форма образования";
                 svodFO.Cells[1, 2].Value = "Отличник";
@@ -760,7 +1142,7 @@ namespace Uspevaemost_API.Services
             // по квоте
             var svodQuote = package.Workbook.Worksheets.Add("по квоте");
             {
-                List<string[]> groups = req.getbyQuote(year, sem, uo, fo, curs);
+                List<string[]> groups = req.getbyQuote(year, sem, uo, fo, curs, username);
 
                 svodQuote.Cells[1, 1].Value = "Квота";
                 svodQuote.Cells[1, 2].Value = "Отличник";
@@ -848,7 +1230,7 @@ namespace Uspevaemost_API.Services
             // по гражданству
             var svodCountry = package.Workbook.Worksheets.Add("по гражданству");
             {
-                List<string[]> groups = req.getbyCountry(year, sem, uo, fo, curs);
+                List<string[]> groups = req.getbyCountry(year, sem, uo, fo, curs, username);
 
                 svodCountry.Cells[1, 1].Value = "Гражданство";
                 svodCountry.Cells[1, 2].Value = "Отличник";
@@ -936,7 +1318,7 @@ namespace Uspevaemost_API.Services
             // по студентам с ООП
             var invData = package.Workbook.Worksheets.Add("Студенты с ООП");
             {
-                list = req.getDataInv(year, sem, uo, fo, curs);
+                list = req.getDataInv(year, sem, uo, fo, curs, username);
                 for (int i = 1; i < 10; i++)
                 {
                     invData.Cells[1, i, 2, i].Merge = true;
@@ -1121,7 +1503,7 @@ namespace Uspevaemost_API.Services
             // по АЗ по студентам с ООП
             var invDolgi = package.Workbook.Worksheets.Add("АЗ студентов с ООП");
             {
-                list = req.getInvDolgi(year, sem, uo, fo, curs);
+                list = req.getInvDolgi(year, sem, uo, fo, curs, username);
 
                 invDolgi.Cells[1, 1, 1, 21].Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
                 invDolgi.Cells[1, 1, 1, 21].Style.VerticalAlignment = ExcelVerticalAlignment.Center;
@@ -2326,7 +2708,7 @@ namespace Uspevaemost_API.Services
             }
 
 
-            list = req.getDisc(year, sem, uo, fo, curs);
+            list = req.getDisc(year, sem, uo, fo, curs, username);
 
             var discs = package.Workbook.Worksheets.Add("По дисциплинам");
             {

@@ -6,7 +6,7 @@ namespace Uspevaemost_API.Controllers
 {
     [ApiController]
     [Route("[controller]")]
-    [Authorize]
+
     public class ExcelController : Controller
     {
     
@@ -22,24 +22,20 @@ namespace Uspevaemost_API.Controllers
         public async Task<IActionResult> DownloadReport([FromBody] Models.ReportRequest request)
         {
 
-            var username = request.name;
-            username = username.Split("\\")[1];
-            Logger.Log(username);
-   
+            var token = request.token;
+            string username = Requests.checkToken(token, conn);
+
             if (username!=null)
             {
-                string uchps = Requests.uchp(username,conn);
-                Logger.Log(uchps);
-                if (uchps != "")
-                {
-                    var fileContent = await _reportService.GenerateExcelReportAsync(request, uchps);
+                
+                var fileContent = await _reportService.GenerateExcelReportAsync(request, username);
 
                     return File(fileContent,
                                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 $"Отчет_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx");
-                }
-                else return Forbid();
-            }else return NotFound();
+                
+                
+            }else return Forbid();
 
 
         }
